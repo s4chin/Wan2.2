@@ -358,6 +358,7 @@ class WanModel(ModelMixin, ConfigMixin):
 
         assert model_type in ['t2v', 'i2v', 'ti2v', 's2v']
         self.model_type = model_type
+        self.gradient_checkpointing = False
 
         self.patch_size = patch_size
         self.text_len = text_len
@@ -487,7 +488,20 @@ class WanModel(ModelMixin, ConfigMixin):
             context_lens=context_lens)
 
         for block in self.blocks:
-            x = block(x, **kwargs)
+            if self.gradient_checkpointing and self.training:
+                x = torch.utils.checkpoint.checkpoint(
+                    block,
+                    x,
+                    e0,
+                    seq_lens,
+                    grid_sizes,
+                    self.freqs,
+                    context,
+                    context_lens,
+                    use_reentrant=False,
+                )
+            else:
+                x = block(x, **kwargs)
 
         # head
         x = self.head(x, e)
@@ -544,3 +558,13 @@ class WanModel(ModelMixin, ConfigMixin):
 
         # init output layer
         nn.init.zeros_(self.head.head.weight)
+
+    def _set_gradient_checkpointing(self, enable: bool = True, gradient_checkpointing_func=None):
+        r"""
+        Enable or disable gradient checkpointing for the model.
+        """
+        self.gradient_checkpointing = enable
+        if gradient_checkpointing_func is not None:
+            self._gradient_checkpointing_func = gradient_checkpointing_func
+        elif enable:
+            self._gradient_checkpointing_func = torch.utils.checkpoint.checkpoint
