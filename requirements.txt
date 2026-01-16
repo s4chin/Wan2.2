@@ -12,5 +12,6 @@ easydict
 ftfy
 dashscope
 imageio-ffmpeg
-flash_attn
+# flash_attn # removed because we install a prebuilt wheel
 numpy>=1.23.5,<2
+decord
