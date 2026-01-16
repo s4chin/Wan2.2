@@ -5,7 +5,7 @@ Main training script for Wan 2.2 finetuning.
 
 Usage:
     # Single GPU
-    python train.py --model_path /path/to/model --use_dummy_data
+    torchrun --nproc_per_node=1 train.py --model_path /path/to/model --use_dummy_data
 
     # Multi-GPU (single node)
     torchrun --nproc_per_node=8 train.py --model_path /path/to/model --use_dummy_data
@@ -25,7 +25,7 @@ import torch.distributed as dist
 
 from wan.configs.wan_ti2v_5B import ti2v_5B as model_config
 from wan.modules.model import WanModel
-from wan.modules.vae2_1 import Wan2_1_VAE
+from wan.modules.vae2_2 import Wan2_2_VAE
 from wan.modules.t5 import T5EncoderModel
 from wan.distributed.fsdp import shard_model
 from wan.data.dataset import DummyVideoDataset
@@ -184,8 +184,7 @@ def main():
     # Load VAE
     if is_main:
         logger.info(f"Loading VAE from {config.vae_path}")
-    vae = Wan2_1_VAE(
-        z_dim=16,
+    vae = Wan2_2_VAE(
         vae_pth=config.vae_path,
         dtype=torch.float,
         device=device,
