@@ -76,6 +76,11 @@ class TrainingConfig:
     gradient_checkpointing: bool = True
     mixed_precision: str = "bf16"
 
+    # LoRA
+    lora_rank: int = 0  # 0 = full finetune, >0 = LoRA
+    lora_alpha: int = 16
+    lora_dropout: float = 0.0
+
     # Loss configuration (DiffSynth-style)
     num_train_timesteps: int = 1000
     timestep_shift: float = 5.0  # Wan-specific shift

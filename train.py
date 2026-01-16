@@ -22,6 +22,7 @@ import random
 
 import torch
 import torch.distributed as dist
+from peft import LoraConfig, get_peft_model
 
 from wan.configs.wan_ti2v_5B import ti2v_5B as model_config
 from wan.modules.model import WanModel
@@ -109,6 +110,14 @@ def parse_args():
     parser.add_argument('--resume', type=str, default=None,
                         help='Path to checkpoint directory to resume from')
 
+    # LoRA
+    parser.add_argument('--lora_rank', type=int, default=0,
+                        help='LoRA rank (0 = full finetune, >0 = LoRA)')
+    parser.add_argument('--lora_alpha', type=int, default=16,
+                        help='LoRA alpha (scaling factor)')
+    parser.add_argument('--lora_dropout', type=float, default=0.0,
+                        help='LoRA dropout')
+
     return parser.parse_args()
 
 
@@ -172,6 +181,9 @@ def main():
         max_steps=args.max_steps,
         gradient_checkpointing=args.gradient_checkpointing,
         mixed_precision=args.mixed_precision,
+        lora_rank=args.lora_rank,
+        lora_alpha=args.lora_alpha,
+        lora_dropout=args.lora_dropout,
         use_fsdp=args.use_fsdp,
         output_dir=args.output_dir,
         save_steps=args.save_steps,
@@ -211,6 +223,26 @@ def main():
 
     if is_main:
         logger.info(f"Model loaded with {sum(p.numel() for p in model.parameters()):,} parameters")
+
+    # Apply LoRA if rank > 0
+    if args.lora_rank > 0:
+        if is_main:
+            logger.info(f"Applying LoRA with rank={args.lora_rank}, alpha={args.lora_alpha}")
+
+        # Target the attention layers (q, k, v, o projections)
+        lora_config = LoraConfig(
+            r=args.lora_rank,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            target_modules=["q", "k", "v", "o"],
+            bias="none",
+        )
+        model = get_peft_model(model, lora_config)
+
+        if is_main:
+            trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            total_params = sum(p.numel() for p in model.parameters())
+            logger.info(f"LoRA trainable params: {trainable_params:,} / {total_params:,} ({100 * trainable_params / total_params:.2f}%)")
 
     # Enable gradient checkpointing if requested
     if config.gradient_checkpointing:
