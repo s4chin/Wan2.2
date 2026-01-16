@@ -227,7 +227,7 @@ class Trainer:
                 x_0=video_latents,
                 context=text_embeddings,
                 seq_len=self.seq_len,
-                y=image_cond,  # Image conditioning for ti2v
+                image_latents=image_cond,  # TI2V: fused into frame 0 of noisy latent
             )
 
             # Scale loss for gradient accumulation
